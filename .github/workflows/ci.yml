@@ -54,11 +54,19 @@ jobs:
 
       # The checkout has no tags; the released changelog sections are compared with the newest release tag.
       - name: Fetch the newest release tag
+        id: release_tag
         run: |
-          tag=$(git ls-remote --tags --sort=-v:refname origin 'v*.*.*' | grep -v '\^{}' | head -1 | sed 's#.*refs/tags/##')
-          git fetch --depth=1 origin "refs/tags/$tag:refs/tags/$tag"
+          tags=$(git ls-remote --tags --refs --sort=-v:refname origin 'v*.*.*')
+          if [[ -z "$tags" ]]; then
+            echo "No release tags found. Skipping released changelog comparison."
+            exit 0
+          fi
+          read -r _ ref <<< "$tags"
+          git fetch --depth=1 origin "$ref:$ref"
+          echo "found=true" >> "$GITHUB_OUTPUT"
 
       - name: Check released changelog sections
+        if: steps.release_tag.outputs.found == 'true'
         run: npm run check:released-changelogs
 
   # Tests are split across parallel jobs so the slowest suites do not run back to back.
